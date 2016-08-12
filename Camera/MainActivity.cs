@@ -29,6 +29,7 @@ namespace Camera {
 		public AndroidCamera m_Camera;
 		TextureView m_TextureView;
 		public static Java.IO.File FileDir;
+		bool isTakeEnabled = false;
 
 		protected override void OnCreate(Bundle savedInstanceState) {
 			base.OnCreate(savedInstanceState);
@@ -52,20 +53,21 @@ namespace Camera {
 			button.Clickable = true;
 
 			button.Touch += (sender, e) => {
-				if (e.Event.Action == MotionEventActions.Down)
+				if (e.Event.Action == MotionEventActions.Down){
+					isTakeEnabled = false;
 					m_Camera.AutoFocus(this);
-				else if (e.Event.Action == MotionEventActions.Up){
-					if((e.Event.GetX() > (button.GetX() - (button.Width / 2))) && 
-					   (e.Event.GetX() < (button.GetX() + (button.Width / 2))) &&
-					   (e.Event.GetY() > (button.GetY() - (button.Height / 2))) &&
-					   (e.Event.GetY() < (button.GetY() + (button.Height / 2)))){
-						m_Camera.TakePicture(null, null, this);
-					}
+				}
 
+				if(e.Event.Action == MotionEventActions.Up) {
+					if ((e.Event.GetX() > button.GetX()) &&
+					    (e.Event.GetX() < (button.GetX() + button.Width)) &&
+					   (e.Event.GetY() > button.GetY()) &&
+					    (e.Event.GetY() < (button.GetY() + button.Height))) {
+						isTakeEnabled = true;
+						m_Camera.AutoFocus(this);
+					}
 				}
 			};
-
-
 
 			rootView.AddView(button);
 		}
@@ -92,7 +94,6 @@ namespace Camera {
 		}
 
 		public void OnSurfaceTextureUpdated(Android.Graphics.SurfaceTexture surface) {
-
 		}
 
 		public void OnSurfaceTextureSizeChanged(Android.Graphics.SurfaceTexture surface, int w, int h) {
@@ -117,7 +118,13 @@ namespace Camera {
 					dir.Mkdir();
 				}
 
-				var f = new Java.IO.File(dir, "img.jpg");
+				var FileList = dir.List();
+				int count = 0;
+				foreach(var tmp in FileList){
+					count++;
+				}
+
+				var f = new Java.IO.File(dir, "DCIM_" + (count + 1) + ".jpg");
 				FileOutputStream fos = new FileOutputStream(f);
 
 				fos.Write(data);
@@ -128,8 +135,9 @@ namespace Camera {
 		}
 
 		public void OnAutoFocus(bool success, AndroidCamera camera) {
-			//DetectScreenOrientation();
-			//m_Camera.TakePicture(null, null, this);
+			if (isTakeEnabled)
+				m_Camera.TakePicture(null, null, this);
+			isTakeEnabled = false;
 		}
 
 		public void DetectScreenOrientation(){
