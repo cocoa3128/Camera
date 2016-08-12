@@ -7,6 +7,7 @@ using Android.Hardware.Camera2;
 using Android.Hardware.Camera2.Params;
 using Android.Views;
 using Android.Media;
+using Android.Graphics;
 
 using Android.Util;
 
@@ -17,6 +18,7 @@ using Java.IO;
 using AndroidCamera = Android.Hardware.Camera;
 using Environment = Android.OS.Environment;
 using Console = System.Console;
+using Matrix = Android.Graphics.Matrix;
 
 namespace Camera {
 	[Activity(
@@ -32,11 +34,15 @@ namespace Camera {
 		TextureView m_TextureView;
 		public static Java.IO.File FileDir;
 		bool isTakeEnabled = false;
+		Display disp;
+		int DisplayWidth = 1080;
+		int DisplayHeight = 1920;
 
 		protected override void OnCreate(Bundle savedInstanceState) {
 			base.OnCreate(savedInstanceState);
+			disp = WindowManager.DefaultDisplay;
 
-			FileDir = Application.FilesDir;
+			GetDisplaySize();
 
 			Window.AddFlags(WindowManagerFlags.Fullscreen);
 			RequestWindowFeature(WindowFeatures.NoTitle);
@@ -76,9 +82,14 @@ namespace Camera {
 
 		public void OnSurfaceTextureAvailable(Android.Graphics.SurfaceTexture surface, int w, int h) {
 			m_Camera = AndroidCamera.Open();
-			m_TextureView.LayoutParameters = new FrameLayout.LayoutParams(w, h);
 
-			DetectScreenOrientation();
+			bool landscape = isLandScapeMode();
+			if(!landscape)
+				m_TextureView.LayoutParameters = new FrameLayout.LayoutParams(DisplayWidth * 2, DisplayHeight * 2);
+			else
+				m_TextureView.LayoutParameters = new FrameLayout.LayoutParams(DisplayHeight * 2, DisplayWidth * 2);
+
+			SetScreenOrientation();
 
 			try {
 				m_Camera.SetPreviewTexture(surface);
@@ -96,16 +107,27 @@ namespace Camera {
 		}
 
 		public void OnSurfaceTextureUpdated(Android.Graphics.SurfaceTexture surface) {
+			SetScreenOrientation();
+
+			var param = m_Camera.GetParameters();
+
+			param.SetPictureSize(DisplayHeight * 2 , DisplayWidth * 2);
+					
+			m_Camera.SetParameters(param);
+
 		}
 
 		public void OnSurfaceTextureSizeChanged(Android.Graphics.SurfaceTexture surface, int w, int h) {
-			m_TextureView.LayoutParameters = new FrameLayout.LayoutParams(w, h);
+			bool landscape = isLandScapeMode();
+			if (!landscape)
+				m_TextureView.LayoutParameters = new FrameLayout.LayoutParams(DisplayWidth * 2, DisplayHeight * 2);
+			else
+				m_TextureView.LayoutParameters = new FrameLayout.LayoutParams(DisplayHeight * 2, DisplayWidth * 2);
 
-			DetectScreenOrientation();
+			SetScreenOrientation();
 
 			try {
 				m_Camera.StopPreview();
-				m_Camera.Release();
 				m_Camera.SetPreviewTexture(surface);
 				m_Camera.StartPreview();
 			} catch (Java.IO.IOException e) {
@@ -126,11 +148,18 @@ namespace Camera {
 					count++;
 				}
 
-				var FileName = new Java.IO.File(SaveDir, "DCIM_" + (count + 1) + ".jpg");
-				FileOutputStream fos = new FileOutputStream(FileName);
+				Matrix matrix = new Matrix();
+				matrix.SetRotate(90 - DetectScreenOrientation());
+				Bitmap original = BitmapFactory.DecodeByteArray(data, 0, data.Length);
+				Bitmap rotated = Bitmap.CreateBitmap(original, 0, 0, original.Width, original.Height, matrix, true);
 
-				fos.Write(data);
-				fos.Close();
+				var FileName = new Java.IO.File(SaveDir, "DCIM_" + (count + 1) + ".jpg");
+				//FileOutputStream fos = new FileOutputStream(FileName);
+				System.IO.FileStream stream = new FileStream(FileName.ToString(), FileMode.CreateNew);
+				//fos.Write(data);
+				rotated.Compress(Bitmap.CompressFormat.Jpeg, 90, stream);
+				//fos.Close();
+				stream.Close();
 
 				string[] FilePath = { Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim) + "/Camera/" + "DCIM_" + (count + 1) + ".jpg" };
 				string[] mimeType = { "image/jpeg" };
@@ -138,6 +167,9 @@ namespace Camera {
 
 				Toast.MakeText(ApplicationContext, "保存しました\n" + FileName, ToastLength.Short).Show();
 				m_Camera.StartPreview();
+
+				original.Recycle();
+				rotated.Recycle();
 			} catch (Exception e) {
 				Console.WriteLine(e.Message);
 			}
@@ -149,15 +181,70 @@ namespace Camera {
 			isTakeEnabled = false;
 		}
 
-		public void DetectScreenOrientation(){
-			Display disp = WindowManager.DefaultDisplay;
-			var rotation = disp.Rotation;
-			if (rotation == SurfaceOrientation.Rotation0 || rotation == SurfaceOrientation.Rotation180) {
+		public bool SetScreenOrientation(){
+			var orientation = DetectScreenOrientation();
+			bool ReturnValue = false;
+			if ((orientation == 0) || (orientation == 180)) {
 				m_Camera.SetDisplayOrientation(90);
-			} else {
+				ReturnValue = false;
+			} else if(orientation == 90) {
 				m_Camera.SetDisplayOrientation(0);
+				ReturnValue = true;
+			}else if(orientation == 270){
+				m_Camera.SetDisplayOrientation(180);
+				ReturnValue = true;
 			}
 
+			return ReturnValue;
+		}
+
+		public int DetectScreenOrientation(){
+			var rotation = disp.Rotation;
+			int ReturnValue = 0;
+
+			switch (rotation) {
+				case SurfaceOrientation.Rotation0:
+					ReturnValue = 0;
+					break;
+				case SurfaceOrientation.Rotation90:
+					ReturnValue = 90;
+					break;
+				case SurfaceOrientation.Rotation180:
+					ReturnValue = 180;
+					break;
+				case SurfaceOrientation.Rotation270:
+					ReturnValue = 270;
+					break;
+			}
+			return ReturnValue;
+		}
+
+		public bool isLandScapeMode(){
+			var orientation = DetectScreenOrientation();
+			bool ReturnValue = false;
+
+			if ((orientation == 0) || (orientation == 180)) {
+				ReturnValue = false;
+			} else{
+				ReturnValue = true;
+			}
+
+			return ReturnValue;
+
+		}
+
+
+		public void GetDisplaySize(){
+			Point point = new Point(0, 0);
+			disp.GetRealSize(point);
+
+			if (point.X < point.Y) {
+				DisplayWidth = point.X;
+				DisplayHeight = point.Y;
+			}else{
+				DisplayWidth = point.Y;
+				DisplayHeight = point.X;
+			}
 		}
 	}
 }
