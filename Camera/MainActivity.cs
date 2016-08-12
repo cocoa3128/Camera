@@ -6,6 +6,7 @@ using Android.Hardware;
 using Android.Hardware.Camera2;
 using Android.Hardware.Camera2.Params;
 using Android.Views;
+using Android.Media;
 
 using Android.Util;
 
@@ -15,6 +16,7 @@ using Java.IO;
 
 using AndroidCamera = Android.Hardware.Camera;
 using Environment = Android.OS.Environment;
+using Console = System.Console;
 
 namespace Camera {
 	[Activity(
@@ -113,25 +115,32 @@ namespace Camera {
 
 		public void OnPictureTaken(byte[] data, AndroidCamera camera) {
 			try {
-				var dir = new Java.IO.File(Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim), "Camera");
-				if (!dir.Exists()) {
-					dir.Mkdir();
+				var SaveDir = new Java.IO.File(Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim), "Camera");
+				if (!SaveDir.Exists()) {
+					SaveDir.Mkdir();
 				}
 
-				var FileList = dir.List();
+				var Files = SaveDir.List();
 				int count = 0;
-				foreach(var tmp in FileList){
+				foreach(var tmp in Files){
 					count++;
 				}
 
-				var f = new Java.IO.File(dir, "DCIM_" + (count + 1) + ".jpg");
-				FileOutputStream fos = new FileOutputStream(f);
+				var FileName = new Java.IO.File(SaveDir, "DCIM_" + (count + 1) + ".jpg");
+				FileOutputStream fos = new FileOutputStream(FileName);
 
 				fos.Write(data);
-				Toast.MakeText(ApplicationContext, "写真を保存しました" + f, ToastLength.Short).Show();
 				fos.Close();
+
+				string[] FilePath = { Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim) + "/Camera/" + "DCIM_" + (count + 1) + ".jpg" };
+				string[] mimeType = { "image/jpeg" };
+				MediaScannerConnection.ScanFile(ApplicationContext, FilePath, mimeType, null);
+
+				Toast.MakeText(ApplicationContext, "保存しました\n" + FileName, ToastLength.Short).Show();
 				m_Camera.StartPreview();
-			} catch (Exception e) { }
+			} catch (Exception e) {
+				Console.WriteLine(e.Message);
+			}
 		}
 
 		public void OnAutoFocus(bool success, AndroidCamera camera) {
