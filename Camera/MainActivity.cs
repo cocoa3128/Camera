@@ -1,23 +1,17 @@
-﻿using Android.App;
-using Android.Widget;
-using Android.OS;
-
-using Android.Hardware;
-using Android.Hardware.Camera2;
-using Android.Hardware.Camera2.Params;
-using Android.Views;
-using Android.Media;
-using Android.Graphics;
-
-using Android.Util;
-
-using System;
+﻿using System;
 using System.IO;
-using Java.IO;
+using System.Threading.Tasks;
+
+using Android.App;
+using Android.Graphics;
+using Android.Media;
+using Android.OS;
+using Android.Views;
+using Android.Widget;
 
 using AndroidCamera = Android.Hardware.Camera;
-using Environment = Android.OS.Environment;
 using Console = System.Console;
+using Environment = Android.OS.Environment;
 using Matrix = Android.Graphics.Matrix;
 
 namespace Camera {
@@ -32,11 +26,13 @@ namespace Camera {
 
 		public AndroidCamera m_Camera;
 		TextureView m_TextureView;
-		public static Java.IO.File FileDir;
 		bool isTakeEnabled = false;
 		Display disp;
 		int DisplayWidth = 1080;
 		int DisplayHeight = 1920;
+
+		float StartX = 0;
+		float StartY = 0;
 
 		protected override void OnCreate(Bundle savedInstanceState) {
 			base.OnCreate(savedInstanceState);
@@ -44,8 +40,8 @@ namespace Camera {
 
 			GetDisplaySize();
 
-			Window.AddFlags(WindowManagerFlags.Fullscreen);
-			RequestWindowFeature(WindowFeatures.NoTitle);
+			Window.AddFlags(WindowManagerFlags.Fullscreen);	// 全画面表示に
+			RequestWindowFeature(WindowFeatures.NoTitle);	// タイトルバーをなくす
 
 			FrameLayout rootView = new FrameLayout(ApplicationContext);
 			SetContentView(rootView);
@@ -53,7 +49,42 @@ namespace Camera {
 			m_TextureView = new TextureView(ApplicationContext);
 			m_TextureView.SurfaceTextureListener = this;
 
+			m_TextureView.Touch += (sender, e) => {
+				if(e.Event.Action == MotionEventActions.Down){
+					StartX = e.Event.GetX();
+					StartY = e.Event.GetY();
+				}
+
+				if (e.Event.Action == MotionEventActions.Move) {
+
+					var param = m_Camera.GetParameters();
+					var Zoom = param.Zoom;
+
+					if(e.Event.GetY() > (StartY + 50)){
+						Zoom--;
+						StartY = e.Event.GetY();
+					}else if (e.Event.GetY() < (StartY - 50)) {
+						Zoom++;
+						StartY = e.Event.GetY();
+					}
+
+
+					if (Zoom > param.MaxZoom)
+						Zoom = param.MaxZoom;
+					if (Zoom < 1)
+						Zoom = 1;
+
+					param.Zoom = Zoom;
+					m_Camera.SetParameters(param);
+
+					Console.WriteLine("StartY:" + StartY +
+									  "\nNowY:" + e.Event.GetY() +
+									  "\nZoom" + Zoom);
+				}
+			};
+
 			rootView.AddView(m_TextureView);
+
 
 			Button button = new Button(ApplicationContext);
 			button.Text = "撮影";
@@ -66,11 +97,13 @@ namespace Camera {
 					m_Camera.AutoFocus(this);
 				}
 
-				if(e.Event.Action == MotionEventActions.Up) {
+				if((!isTakeEnabled) && (e.Event.Action == MotionEventActions.Up)) {
+					// 撮影中ではない & ボタンから指が離れた
 					if ((e.Event.GetX() > button.GetX()) &&
 					    (e.Event.GetX() < (button.GetX() + button.Width)) &&
 					   (e.Event.GetY() > button.GetY()) &&
 					    (e.Event.GetY() < (button.GetY() + button.Height))) {
+						// 指が離れた時にボタン上に指があった
 						isTakeEnabled = true;
 						m_Camera.AutoFocus(this);
 					}
@@ -106,13 +139,13 @@ namespace Camera {
 			return true;
 		}
 
+		// SurfaceViewが更新された時に呼び出される
 		public void OnSurfaceTextureUpdated(Android.Graphics.SurfaceTexture surface) {
 			SetScreenOrientation();
 
+			// 写真のサイズを画面サイズの4倍(縦横2倍)に設定
 			var param = m_Camera.GetParameters();
-
 			param.SetPictureSize(DisplayHeight * 2 , DisplayWidth * 2);
-					
 			m_Camera.SetParameters(param);
 
 		}
@@ -135,6 +168,7 @@ namespace Camera {
 			}
 		}
 
+		// シャッターを切った時のコールバック
 		public void OnPictureTaken(byte[] data, AndroidCamera camera) {
 			try {
 				var SaveDir = new Java.IO.File(Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim), "Camera");
@@ -142,45 +176,54 @@ namespace Camera {
 					SaveDir.Mkdir();
 				}
 
+				// 保存ディレクトリに入ってるファイル数をカウント
 				var Files = SaveDir.List();
 				int count = 0;
 				foreach(var tmp in Files){
 					count++;
 				}
 
-				Matrix matrix = new Matrix();
+				Matrix matrix = new Matrix();	// 回転用の行列
 				matrix.SetRotate(90 - DetectScreenOrientation());
 				Bitmap original = BitmapFactory.DecodeByteArray(data, 0, data.Length);
 				Bitmap rotated = Bitmap.CreateBitmap(original, 0, 0, original.Width, original.Height, matrix, true);
 
 				var FileName = new Java.IO.File(SaveDir, "DCIM_" + (count + 1) + ".jpg");
-				//FileOutputStream fos = new FileOutputStream(FileName);
-				System.IO.FileStream stream = new FileStream(FileName.ToString(), FileMode.CreateNew);
-				//fos.Write(data);
-				rotated.Compress(Bitmap.CompressFormat.Jpeg, 90, stream);
-				//fos.Close();
-				stream.Close();
 
-				string[] FilePath = { Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim) + "/Camera/" + "DCIM_" + (count + 1) + ".jpg" };
-				string[] mimeType = { "image/jpeg" };
-				MediaScannerConnection.ScanFile(ApplicationContext, FilePath, mimeType, null);
+				// 非同期で画面の回転処理とアルバムへの登録を行う
+				Task.Run(async () => {
 
-				Toast.MakeText(ApplicationContext, "保存しました\n" + FileName, ToastLength.Short).Show();
+					// ファイルをストレージに保存
+					FileStream stream = new FileStream(FileName.ToString(), FileMode.CreateNew);
+					await rotated.CompressAsync(Bitmap.CompressFormat.Jpeg, 90, stream);
+					stream.Close();
+
+					// 保存したファイルをアルバムに登録
+					string[] FilePath = { Environment.GetExternalStoragePublicDirectory(Environment.DirectoryDcim) + "/Camera/" + "DCIM_" + (count + 1) + ".jpg" };
+					string[] mimeType = { "image/jpeg" };
+					MediaScannerConnection.ScanFile(ApplicationContext, FilePath, mimeType, null);
+					RunOnUiThread(() => {
+						Toast.MakeText(ApplicationContext, "保存しました\n" + FileName, ToastLength.Short).Show();
+					});
+					original.Recycle();
+					rotated.Recycle();
+
+					isTakeEnabled = false;
+				});
+
 				m_Camera.StartPreview();
-
-				original.Recycle();
-				rotated.Recycle();
 			} catch (Exception e) {
 				Console.WriteLine(e.Message);
 			}
 		}
 
+		// AutoFocusのコールバック
 		public void OnAutoFocus(bool success, AndroidCamera camera) {
 			if (isTakeEnabled)
 				m_Camera.TakePicture(null, null, this);
-			isTakeEnabled = false;
 		}
 
+		// 画面の向きに合わせてSurfaceViewの向きを変更
 		public bool SetScreenOrientation(){
 			var orientation = DetectScreenOrientation();
 			bool ReturnValue = false;
@@ -198,6 +241,7 @@ namespace Camera {
 			return ReturnValue;
 		}
 
+		// 角度単位で画面の向きを検出
 		public int DetectScreenOrientation(){
 			var rotation = disp.Rotation;
 			int ReturnValue = 0;
@@ -219,6 +263,7 @@ namespace Camera {
 			return ReturnValue;
 		}
 
+		// 横向きかどうかを確認する
 		public bool isLandScapeMode(){
 			var orientation = DetectScreenOrientation();
 			bool ReturnValue = false;
@@ -234,6 +279,7 @@ namespace Camera {
 		}
 
 
+		// 画面のサイズを取得する
 		public void GetDisplaySize(){
 			Point point = new Point(0, 0);
 			disp.GetRealSize(point);
