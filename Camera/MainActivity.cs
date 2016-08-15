@@ -1,9 +1,11 @@
 ﻿using System;
 
 using Android.App;
+using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
+using Android.Hardware;
 using AndroidCamera2 = Android.Hardware.Camera2;
 
 namespace Camera {
@@ -12,15 +14,20 @@ namespace Camera {
 		MainLauncher = true,
 		Icon = "@mipmap/icon",
 		HardwareAccelerated = true,
+		ScreenOrientation = Android.Content.PM.ScreenOrientation.Landscape,
 		ConfigurationChanges = Android.Content.PM.ConfigChanges.Orientation
 	)]
 	[Obsolete]
 	public class MainActivity : Activity,TextureView.ISurfaceTextureListener {
 
 
+
 		TextureView m_TextureView;
 		FrameLayout rootView;
 		Camera2API m_Camera2;
+
+		OrientaionChange m_OrientationChange;
+		SensorManager m_SensorManager;
 
 
 		protected override void OnCreate(Bundle savedInstanceState) {
@@ -42,6 +49,11 @@ namespace Camera {
 
 			m_Camera2 = new Camera2API(ApplicationContext, m_TextureView);
 
+			m_OrientationChange = new OrientaionChange(ApplicationContext);
+
+			m_SensorManager = (SensorManager)GetSystemService(Context.SensorService);
+
+
 			/* 度分秒に変換するやつ
 			degree = (int)(location.Latitude);
 			minute = (int)((location.Latitude - degree) * 60);
@@ -52,12 +64,24 @@ namespace Camera {
 		}
 
 		protected override void OnResume() {
-			rootView.SystemUiVisibility = (StatusBarVisibility)SystemUiFlags.ImmersiveSticky | (StatusBarVisibility)SystemUiFlags.HideNavigation;
 			base.OnResume();
+			rootView.SystemUiVisibility = (StatusBarVisibility)SystemUiFlags.ImmersiveSticky | (StatusBarVisibility)SystemUiFlags.HideNavigation;
+
+			m_SensorManager.RegisterListener(m_OrientationChange,
+			                                 m_SensorManager.GetDefaultSensor(SensorType.Accelerometer),
+			                                 SensorDelay.Ui);
+
+			m_SensorManager.RegisterListener(m_OrientationChange,
+											 m_SensorManager.GetDefaultSensor(SensorType.MagneticField),
+			                                 SensorDelay.Ui);
+
+
+			Toast.MakeText(ApplicationContext, "第二段階", ToastLength.Short).Show();
+
 		}
 
 		protected override void OnPause() {
-			
+			m_SensorManager.UnregisterListener(m_OrientationChange);
 			base.OnPause();
 		}
 

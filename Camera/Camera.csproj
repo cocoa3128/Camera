@@ -61,6 +61,7 @@
     <Compile Include="Camera2API.cs" />
     <Compile Include="CameraDevice.cs" />
     <Compile Include="CameraCapture.cs" />
+    <Compile Include="OrientaionChange.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\AboutResources.txt" />
