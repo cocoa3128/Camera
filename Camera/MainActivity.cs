@@ -1,7 +1,6 @@
 ﻿using System;
 
 using Android.App;
-using Android.Content;
 using Android.OS;
 using Android.Views;
 using Android.Widget;
@@ -16,18 +15,17 @@ namespace Camera {
 		HardwareAccelerated = true,
 		ScreenOrientation = Android.Content.PM.ScreenOrientation.Landscape,
 		ConfigurationChanges = Android.Content.PM.ConfigChanges.Orientation
-	)]
-	[Obsolete]
+	),Obsolete]
 	public class MainActivity : Activity,TextureView.ISurfaceTextureListener {
 
 
 
-		TextureView m_TextureView;
+		TextureView mTextureView;
 		FrameLayout rootView;
-		Camera2API m_Camera2;
+		Camera2API mCamera2;
 
-		OrientaionChange m_OrientationChange;
-		SensorManager m_SensorManager;
+		OrientaionChange mOrientationChange;
+		SensorManager mSensorManager;
 
 
 		protected override void OnCreate(Bundle savedInstanceState) {
@@ -42,16 +40,16 @@ namespace Camera {
 			SetContentView(rootView);
 
 
-			m_TextureView = new TextureView(ApplicationContext);
-			m_TextureView.SurfaceTextureListener = this;
+			mTextureView = new TextureView(ApplicationContext);
+			mTextureView.SurfaceTextureListener = this;
 	
-			rootView.AddView(m_TextureView);
+			rootView.AddView(mTextureView);
 
-			m_Camera2 = new Camera2API(ApplicationContext, m_TextureView);
+			mCamera2 = new Camera2API(ApplicationContext, mTextureView);
 
-			m_OrientationChange = new OrientaionChange(ApplicationContext);
+			mOrientationChange = new OrientaionChange(ApplicationContext);
 
-			m_SensorManager = (SensorManager)GetSystemService(Context.SensorService);
+			mSensorManager = (SensorManager)GetSystemService(SensorService);
 
 
 			/* 度分秒に変換するやつ
@@ -67,12 +65,12 @@ namespace Camera {
 			base.OnResume();
 			rootView.SystemUiVisibility = (StatusBarVisibility)SystemUiFlags.ImmersiveSticky | (StatusBarVisibility)SystemUiFlags.HideNavigation;
 
-			m_SensorManager.RegisterListener(m_OrientationChange,
-			                                 m_SensorManager.GetDefaultSensor(SensorType.Accelerometer),
+			mSensorManager.RegisterListener(mOrientationChange,
+			                                 mSensorManager.GetDefaultSensor(SensorType.Accelerometer),
 			                                 SensorDelay.Ui);
 
-			m_SensorManager.RegisterListener(m_OrientationChange,
-											 m_SensorManager.GetDefaultSensor(SensorType.MagneticField),
+			mSensorManager.RegisterListener(mOrientationChange,
+			                                 mSensorManager.GetDefaultSensor(SensorType.MagneticField),
 			                                 SensorDelay.Ui);
 
 
@@ -81,17 +79,17 @@ namespace Camera {
 		}
 
 		protected override void OnPause() {
-			m_SensorManager.UnregisterListener(m_OrientationChange);
+			mSensorManager.UnregisterListener(mOrientationChange);
 			base.OnPause();
 		}
 
 		#region SurfaceViewのリスナー
 		public void OnSurfaceTextureAvailable(Android.Graphics.SurfaceTexture surface, int w, int h) {
-			m_Camera2.OpenCamera(AndroidCamera2.LensFacing.Front);
+			mCamera2.OpenCamera(AndroidCamera2.LensFacing.Front);
 		}
 
 		public bool OnSurfaceTextureDestroyed(Android.Graphics.SurfaceTexture surface) {
-			m_Camera2.CloseCamera();
+			mCamera2.CloseCamera();
 			return false;
 		}
 
@@ -103,7 +101,7 @@ namespace Camera {
 		#endregion
 
 		public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig) {
-			m_Camera2.OnOrientationChanged();
+			mCamera2.OnOrientationChanged();
 
 			Console.WriteLine("Orientation Changed!!!!!");
 			base.OnConfigurationChanged(newConfig);
