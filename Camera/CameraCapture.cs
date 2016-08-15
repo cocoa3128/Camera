@@ -1,23 +1,27 @@
-﻿using AndroidCamera2 = Android.Hardware.Camera2;
+﻿using System;
+
+using AndroidCamera2 = Android.Hardware.Camera2;
 
 
 namespace Camera {
 	public class CameraCapture: AndroidCamera2.CameraCaptureSession.StateCallback {
-		public AndroidCamera2.CameraCaptureSession mSession;
-		Camera2API mCamea2API;
+		//public static AndroidCamera2.CameraCaptureSession mSession;
 
-		public CameraCapture(Camera2API api) {
-			mCamea2API = api;
+		public CameraCapture() {
 		}
 
+		public Action<AndroidCamera2.CameraCaptureSession> OnConfiguredAction;
 		public override void OnConfigured(AndroidCamera2.CameraCaptureSession session) {
-			mSession = session;
-			mCamea2API.UpdatePreview();
+			if(OnConfiguredAction != null){
+				OnConfiguredAction(session);
+			}
+		}
+		public Action<AndroidCamera2.CameraCaptureSession> OnConfigueFailedAction;
+		public override void OnConfigureFailed(AndroidCamera2.CameraCaptureSession session) {
+			if (OnConfigueFailedAction != null)
+				OnConfigueFailedAction(session);
 		}
 
-		public override void OnConfigureFailed(AndroidCamera2.CameraCaptureSession session) {
-			
-		}
 
 	}
 }

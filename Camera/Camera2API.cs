@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 
+using Android.App;
+using Android.Widget;
 using Android.Content;
 using Android.Graphics;
 using Android.Hardware.Camera2.Params;
@@ -8,14 +10,14 @@ using Android.OS;
 using Android.Runtime;
 using Android.Util;
 using Android.Views;
-using Android.Widget;
+using Android.Hardware;
 
 using AndroidCamera2 = Android.Hardware.Camera2;
 using Matrix = Android.Graphics.Matrix;
 
 namespace Camera {
 
-	public class Camera2API {
+	public class Camera2API: Activity {
 		public enum CameraRotation{
 			ROTATION_0,
 			ROTATION_90,
@@ -35,12 +37,11 @@ namespace Camera {
 		};
 
 
-		Camera2API mCamera2API;
 
+		AndroidCamera2.CameraCaptureSession mSession;
+		AndroidCamera2.CameraDevice mCamera;
 		public AndroidCamera2.CameraManager mCameraManager;
 		Context mContext;
-		CameraDevice mCameraDevice;
-		CameraCapture mPreviewSession;
 		CameraRotation mCameraRotation;
 		AndroidCamera2.CaptureRequest.Builder mPreviewBuilder;
 		Size mCameraSize;
@@ -52,14 +53,11 @@ namespace Camera {
 		public Camera2API(Context context, TextureView texture)  {
 			mContext = context;
 			mTextureView = texture;
-			mCamera2API = this;
-			mCameraDevice = new CameraDevice(this);
-			mPreviewSession = new CameraCapture(this);
 			mCameraManager = (AndroidCamera2.CameraManager)mContext.GetSystemService(Context.CameraService);
 
 
-			IWindowManager WindowManager = mContext.GetSystemService(Context.WindowService).JavaCast<IWindowManager>();
-			display = WindowManager.DefaultDisplay;
+			IWindowManager windowManager = mContext.GetSystemService(Context.WindowService).JavaCast<IWindowManager>();
+			display = windowManager.DefaultDisplay;
 			GetDisplaySize();
 		}
 
@@ -68,11 +66,21 @@ namespace Camera {
 				foreach (var cameraId in mCameraManager.GetCameraIdList()) {
 					
 					AndroidCamera2.CameraCharacteristics mCharacteristics = mCameraManager.GetCameraCharacteristics(cameraId);
-					Java.Lang.Object a = 123;
 					if ((int)mCharacteristics.Get(AndroidCamera2.CameraCharacteristics.LensFacing) == GetValueFromKey(facing)) {
 						StreamConfigurationMap map = (StreamConfigurationMap)mCharacteristics.Get(AndroidCamera2.CameraCharacteristics.ScalerStreamConfigurationMap);
 						mCameraSize = map.GetOutputSizes(Java.Lang.Class.FromType(typeof(SurfaceTexture)))[0];
-						mCameraManager.OpenCamera(cameraId, mCameraDevice, null);
+						HandlerThread thread = new HandlerThread("Open Camera");
+						thread.Start();
+
+						Handler BGHandler = new Handler(thread.Looper);
+						mCameraManager.OpenCamera(cameraId,
+												  new CameraDevice() {
+													  OnOpenedAction = (obj) => {
+														  mCamera = obj;
+														  CreateCaptureSettion();
+													  }
+												  },
+												  BGHandler);
 
 						return;
 					}
@@ -84,11 +92,11 @@ namespace Camera {
 		}
 
 		public void CloseCamera(){
-			mCameraDevice.mCamera.Close();
+			mCamera.Close();
 			mCameraManager.UnregisterFromRuntime();
 		}
 
-		public void CreateCaptureSettion(){
+		public void CreateCaptureSettion() {
 			if (!mTextureView.IsAvailable)
 				return;
 
@@ -96,7 +104,7 @@ namespace Camera {
 			var rotation = 0;
 			Vector<float> Scale = new Vector<float>(0, 0);
 			DetectCameraRotation();
-			switch(mCameraRotation){
+			switch (mCameraRotation) {
 				case CameraRotation.ROTATION_0:
 					rotation = 0;
 					Scale.X = 1;// (float)mCameraSize.Height / mCameraSize.Width;
@@ -122,10 +130,12 @@ namespace Camera {
 			Matrix matrix = new Matrix();
 			matrix.PostRotate(rotation, DisplaySize.Y / 2, DisplaySize.X / 2);
 			matrix.PostScale(Scale.X,
-			                 Scale.Y, 
-			                 DisplaySize.Y / 2,
-			                 DisplaySize.X / 2);
-			mTextureView.SetTransform(matrix);
+							 Scale.Y,
+							 DisplaySize.Y / 2,
+							 DisplaySize.X / 2);
+			RunOnUiThread(() => {
+				mTextureView.SetTransform(matrix);
+			});
 			Toast.MakeText(mContext, "Width:" + mTextureView.Width +
 						   "\nHeight:" + mTextureView.Height,
 						   ToastLength.Short).Show();
@@ -134,32 +144,38 @@ namespace Camera {
 			Surface surface = new Surface(texture);
 
 
-			try{
-				mPreviewBuilder = mCameraDevice.mCamera.CreateCaptureRequest(AndroidCamera2.CameraTemplate.Preview);
+			try {
+				mPreviewBuilder = mCamera.CreateCaptureRequest(AndroidCamera2.CameraTemplate.Preview);
 
-			}catch(AndroidCamera2.CameraAccessException e){
+			} catch (AndroidCamera2.CameraAccessException e) {
 				Log.Debug("{0}", e.ToString());
 			}
 
 			mPreviewBuilder.AddTarget(surface);
 			var list = new List<Surface>();
 			list.Add(surface);
-			try{
-				mCameraDevice.mCamera.CreateCaptureSession(list, mPreviewSession, null);
-			}catch(AndroidCamera2.CameraAccessException e){
+			try {
+				mCamera.CreateCaptureSession(new List<Surface>{surface},
+											 new CameraCapture() {
+												 OnConfiguredAction = (obj) => {
+													 mSession = obj;
+													 UpdatePreview();
+												 }
+											 },
+											 null);
+			} catch (AndroidCamera2.CameraAccessException e) {
 				Log.Debug("{0}", e.ToString());
 			}
 		}
 
 		public void UpdatePreview(){
-			var a = AndroidCamera2.ControlAFMode.ContinuousPicture;
 			mPreviewBuilder.Set(AndroidCamera2.CaptureRequest.ControlAfMode, 4);
-			HandlerThread thread = new HandlerThread("CameraPreview");
+			HandlerThread thread = new HandlerThread("Camera Preview");
 			thread.Start();
 			Handler BGHandler = new Handler(thread.Looper);
 
 			try{
-				mPreviewSession.mSession.SetRepeatingRequest(mPreviewBuilder.Build(), null, BGHandler);
+				mSession.SetRepeatingRequest(mPreviewBuilder.Build(), null, BGHandler);
 			}catch(AndroidCamera2.CameraAccessException e){
 				Log.Debug("{0}", e.ToString());
 			}

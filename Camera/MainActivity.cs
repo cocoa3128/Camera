@@ -74,8 +74,6 @@ namespace Camera {
 			                                 SensorDelay.Ui);
 
 
-			Toast.MakeText(ApplicationContext, "第二段階", ToastLength.Short).Show();
-
 		}
 
 		protected override void OnPause() {
@@ -85,7 +83,7 @@ namespace Camera {
 
 		#region SurfaceViewのリスナー
 		public void OnSurfaceTextureAvailable(Android.Graphics.SurfaceTexture surface, int w, int h) {
-			mCamera2.OpenCamera(AndroidCamera2.LensFacing.Front);
+			mCamera2.OpenCamera(AndroidCamera2.LensFacing.Back);
 		}
 
 		public bool OnSurfaceTextureDestroyed(Android.Graphics.SurfaceTexture surface) {
