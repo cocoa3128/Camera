@@ -62,6 +62,8 @@
     <Compile Include="CameraDevice.cs" />
     <Compile Include="CameraCapture.cs" />
     <Compile Include="OrientaionChange.cs" />
+    <Compile Include="GLRenderer.cs" />
+    <Compile Include="GPUData.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\AboutResources.txt" />

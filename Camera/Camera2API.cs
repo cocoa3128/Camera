@@ -44,14 +44,19 @@ namespace Camera {
 		CameraRotation mCameraRotation;
 		AndroidCamera2.CaptureRequest.Builder mPreviewBuilder;
 		Size mCameraSize;
-		TextureView mTextureView;
+		SurfaceTexture mSurfaceTexture;
 		Display display;
 		Vector<int> DisplaySize;
+		int mTextureId;
+		public bool mInitialized{
+			get;
+			private set;
+		}
 
 
-		public Camera2API(Context context, TextureView texture)  {
+		public Camera2API(Context context, int textureId)  {
 			mContext = context;
-			mTextureView = texture;
+			mTextureId = textureId;
 			mCamera2API = this;
 			mCameraDevice = new CameraDevice(this);
 			mPreviewSession = new CameraCapture(this);
@@ -68,11 +73,15 @@ namespace Camera {
 				foreach (var cameraId in mCameraManager.GetCameraIdList()) {
 					
 					AndroidCamera2.CameraCharacteristics mCharacteristics = mCameraManager.GetCameraCharacteristics(cameraId);
-					Java.Lang.Object a = 123;
 					if ((int)mCharacteristics.Get(AndroidCamera2.CameraCharacteristics.LensFacing) == GetValueFromKey(facing)) {
 						StreamConfigurationMap map = (StreamConfigurationMap)mCharacteristics.Get(AndroidCamera2.CameraCharacteristics.ScalerStreamConfigurationMap);
 						mCameraSize = map.GetOutputSizes(Java.Lang.Class.FromType(typeof(SurfaceTexture)))[0];
-						mCameraManager.OpenCamera(cameraId, mCameraDevice, null);
+
+						HandlerThread thread = new HandlerThread("OpenCamera");
+						thread.Start();
+						Handler BGHandler = new Handler(thread.Looper);
+
+						mCameraManager.OpenCamera(cameraId, mCameraDevice, BGHandler);
 
 						return;
 					}
@@ -89,11 +98,7 @@ namespace Camera {
 		}
 
 		public void CreateCaptureSettion(){
-			if (!mTextureView.IsAvailable)
-				return;
-
-
-			var rotation = 0;
+			/*var rotation = 0;
 			Vector<float> Scale = new Vector<float>(0, 0);
 			DetectCameraRotation();
 			switch(mCameraRotation){
@@ -117,9 +122,9 @@ namespace Camera {
 					Scale.X = (float)DisplaySize.Y / DisplaySize.X;
 					Scale.Y = (float)DisplaySize.X / DisplaySize.Y;
 					break;
-			}
+			}*/
 
-			Matrix matrix = new Matrix();
+			/*Matrix matrix = new Matrix();
 			matrix.PostRotate(rotation, DisplaySize.Y / 2, DisplaySize.X / 2);
 			matrix.PostScale(Scale.X,
 			                 Scale.Y, 
@@ -129,9 +134,11 @@ namespace Camera {
 			Toast.MakeText(mContext, "Width:" + mTextureView.Width +
 						   "\nHeight:" + mTextureView.Height,
 						   ToastLength.Short).Show();
-			SurfaceTexture texture = mTextureView.SurfaceTexture;
-			texture.SetDefaultBufferSize(DisplaySize.Y, DisplaySize.X);
-			Surface surface = new Surface(texture);
+			SurfaceTexture texture = mTextureView.SurfaceTexture;*/
+
+			mSurfaceTexture = new SurfaceTexture(mTextureId);
+			mSurfaceTexture.SetDefaultBufferSize(DisplaySize.X, DisplaySize.Y);
+			Surface surface = new Surface(mSurfaceTexture);
 
 
 			try{
@@ -149,10 +156,11 @@ namespace Camera {
 			}catch(AndroidCamera2.CameraAccessException e){
 				Log.Debug("{0}", e.ToString());
 			}
+
+			mInitialized = true;
 		}
 
 		public void UpdatePreview(){
-			var a = AndroidCamera2.ControlAFMode.ContinuousPicture;
 			mPreviewBuilder.Set(AndroidCamera2.CaptureRequest.ControlAfMode, 4);
 			HandlerThread thread = new HandlerThread("CameraPreview");
 			thread.Start();
@@ -169,10 +177,13 @@ namespace Camera {
 
 		}
 
-
+		public void UpdateTexture(){
+			if (mInitialized)
+				mSurfaceTexture.UpdateTexImage();
+		}
 
 		// 画面のサイズを取得する
-		void GetDisplaySize() {
+		public Point GetDisplaySize() {
 			Point point = new Point(0, 0);
 			display.GetRealSize(point);
 
@@ -183,6 +194,8 @@ namespace Camera {
 				DisplaySize.X = point.Y;
 				DisplaySize.Y = point.X;
 			}
+
+			return point;
 		}
 
 		[Obsolete]
@@ -208,7 +221,6 @@ namespace Camera {
 		public void OnOrientationChanged() {
 			Toast.MakeText(mContext, "Rotation Changed", ToastLength.Short).Show();
 			CreateCaptureSettion();
-			//throw new NotImplementedException();
 		}
 
 		int GetValueFromKey(AndroidCamera2.LensFacing request){
