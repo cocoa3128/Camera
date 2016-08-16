@@ -51,6 +51,12 @@ namespace Camera {
 
 			mSensorManager = (SensorManager)GetSystemService(SensorService);
 
+			Button button = new Button(ApplicationContext);
+			button.Click += (sender, e) => {
+				mCamera2.TakePicture();
+			};
+			button.LayoutParameters = new ViewGroup.LayoutParams(200, 150);
+			rootView.AddView(button);
 
 			/* 度分秒に変換するやつ
 			degree = (int)(location.Latitude);

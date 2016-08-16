@@ -9,16 +9,19 @@ using Android.Hardware;
 using AndroidCamera2 = Android.Hardware.Camera2;
 
 namespace Camera {
-	public class TakePicture:AndroidCamera2.CameraCaptureSession.CaptureCallback {
-		public TakePicture() {
+	public class CameraCaptureListner:AndroidCamera2.CameraCaptureSession.CaptureCallback {
+		public CameraCaptureListner() {
 		}
 
 		public override void OnCaptureStarted(AndroidCamera2.CameraCaptureSession session, AndroidCamera2.CaptureRequest request, long timestamp, long frameNumber) {
 			base.OnCaptureStarted(session, request, timestamp, frameNumber);
 		}
 
+		public Action<AndroidCamera2.CameraCaptureSession, AndroidCamera2.CaptureRequest, AndroidCamera2.TotalCaptureResult> OnCaptureCompletedAction;
 		public override void OnCaptureCompleted(AndroidCamera2.CameraCaptureSession session, AndroidCamera2.CaptureRequest request, AndroidCamera2.TotalCaptureResult result) {
-			
+			if (OnCaptureCompletedAction != null)
+				OnCaptureCompletedAction(session, request, result);
+			OnCaptureCompletedAction = null;
 		}
 
 		public override void OnCaptureFailed(AndroidCamera2.CameraCaptureSession session, AndroidCamera2.CaptureRequest request, AndroidCamera2.CaptureFailure failure) {

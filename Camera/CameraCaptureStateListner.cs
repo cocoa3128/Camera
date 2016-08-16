@@ -4,10 +4,10 @@ using AndroidCamera2 = Android.Hardware.Camera2;
 
 
 namespace Camera {
-	public class CameraCapture: AndroidCamera2.CameraCaptureSession.StateCallback {
+	public class CameraCaptureStateListner: AndroidCamera2.CameraCaptureSession.StateCallback {
 		//public static AndroidCamera2.CameraCaptureSession mSession;
 
-		public CameraCapture() {
+		public CameraCaptureStateListner() {
 		}
 
 		public Action<AndroidCamera2.CameraCaptureSession> OnConfiguredAction;

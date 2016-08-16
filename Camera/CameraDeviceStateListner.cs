@@ -3,9 +3,9 @@
 using AndroidCamera2 = Android.Hardware.Camera2;
 
 namespace Camera {
-	public class CameraDevice: AndroidCamera2.CameraDevice.StateCallback {
+	public class CameraDeviceStateListner: AndroidCamera2.CameraDevice.StateCallback {
 
-		public CameraDevice() {
+		public CameraDeviceStateListner() {
 
 		}
 
