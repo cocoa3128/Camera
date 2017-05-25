@@ -59,11 +59,15 @@
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Camera2API.cs" />
-    <Compile Include="CameraDevice.cs" />
-    <Compile Include="CameraCapture.cs" />
+    <Compile Include="CameraDeviceStateListner.cs" />
+    <Compile Include="CameraCaptureStateListner.cs" />
     <Compile Include="OrientaionChange.cs" />
+
     <Compile Include="GLRenderer.cs" />
     <Compile Include="GPUData.cs" />
+
+    <Compile Include="CameraCaptureListner.cs" />
+
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\AboutResources.txt" />

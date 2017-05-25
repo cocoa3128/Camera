@@ -48,6 +48,12 @@ namespace Camera {
 			mOrientationChange = new OrientaionChange(ApplicationContext);
 			mSensorManager = (SensorManager)GetSystemService(SensorService);
 
+			Button button = new Button(ApplicationContext);
+			button.Click += (sender, e) => {
+				mCamera2.TakePicture();
+			};
+			button.LayoutParameters = new ViewGroup.LayoutParams(200, 150);
+			rootView.AddView(button);
 
 
 			/* 度分秒に変換するやつ
@@ -70,7 +76,9 @@ namespace Camera {
 
 			mSensorManager.RegisterListener(mOrientationChange,
 			                                 mSensorManager.GetDefaultSensor(SensorType.MagneticField),
+
 			                                 SensorDelay.Ui);*/
+
 
 		}
 
@@ -79,6 +87,24 @@ namespace Camera {
 			mGLSurfaceView.OnPause();
 			mSensorManager.UnregisterListener(mOrientationChange);
 		}
+
+
+		#region SurfaceViewのリスナー
+		public void OnSurfaceTextureAvailable(Android.Graphics.SurfaceTexture surface, int w, int h) {
+			mCamera2.OpenCamera(AndroidCamera2.LensFacing.Back);
+		}
+
+		public bool OnSurfaceTextureDestroyed(Android.Graphics.SurfaceTexture surface) {
+			mCamera2.CloseCamera();
+			return false;
+		}
+
+		public void OnSurfaceTextureUpdated(Android.Graphics.SurfaceTexture surface) {
+		}
+
+		public void OnSurfaceTextureSizeChanged(Android.Graphics.SurfaceTexture surface, int w, int h) {
+		}
+		#endregion
 
 		public override void OnConfigurationChanged(Android.Content.Res.Configuration newConfig) {
 			mCamera2.OnOrientationChanged();
